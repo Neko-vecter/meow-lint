@@ -2,27 +2,29 @@ import re
 from registry import checker
 
 @checker.define_rule
-def check_invalid_x_placeholder(block):
-    # 把block 转换成行 目标行是 5
-    # 0-4 是上面5行
-    # 6-10 是下面5行
-    # 如果上下没额外行会返回 None
+def rule_name(block):
+    """
+    规则说明（简洁说明检查什么）
+    """
     line = block[5]
-
-    if line is None: 
+    if line is None:
         return None
 
-    pattern = re.compile(r'')
-    match = pattern.match(line)
-    
-    if match:
-        all_hashes = match.group(1)
-        col_missing = match.end(1)
+    # 1. 允许列表（如有）
+    allow_list = []
+    if line in allow_list:
+        return None
 
-        if len(line.strip()) == len(all_hashes):
-            return None
-            
-        reason = "是由上面规则导致的报错"
-        return f"❌ {reason} at column {col_missing}."
-        
+    # 2. 预处理（不要直接 strip 覆盖原始行）
+    stripped = line.lstrip()
+    leading_spaces = len(line) - len(stripped)
+
+    # 3. 匹配逻辑
+    match = None  # or regex.match(...)
+    if match:
+        col = leading_spaces + match.start() + 1
+
+        reason = "short_error_reason_in_lowercase_snake_or_plain_phrase"
+        return f"{reason} at column {col}."
+
     return None

@@ -3,43 +3,79 @@ from registry import checker
 
 @checker.define_rule
 def check_invalid_title_format(block):
+    """
+    Check: Validate Markdown heading format correctness.
+    """
     line = block[5]
-    if line is None: 
+    if line is None:
         return None
 
     pattern = re.compile(r'^(#+)([^\s#].*)$')
     match = pattern.match(line)
-    
-    if match:
-        all_hashes = match.group(1)
-        col_missing = match.end(1)
+    if not match:
+        return None
 
-        if len(line.strip()) == len(all_hashes):
-            return None
-            
-        reason = "mdx 标题错误"
-        return f"{reason} at column {col_missing}."
-        
-    return None
+    hashes = match.group(1)
+
+    # allow headings that contain only hashes (edge case)
+    if len(line.strip()) == len(hashes):
+        return None
+
+    col = len(hashes) + 1  # first character after '#'
+
+    return f"invalid_markdown_heading_format at column {col}."
 
 @checker.define_rule
 def check_invalid_title_space(block):
+    """
+    Check: Heading lines must be surrounded by blank lines.
+    """
     line = block[5]
-    if not line: 
+    if line is None:
         return None
 
-    # 修改正则：允许匹配标准的标题（# 后有空格），或者直接用 startswith
-    if not line.startswith('#'):
+    stripped = line.lstrip()
+    if not stripped.startswith("#"):
         return None
 
-    # 判定前后是否真的有文本（排除换行符的影响）
-    has_text_above = block[4] is not None and block[4].strip() != ""
-    has_text_below = block[6] is not None and block[6].strip() != ""
+    prev_line = block[4]
+    next_line = block[6]
 
-    if has_text_above or has_text_below:
-        return "标题行前后必须有空行隔开."
-        
+    # check above
+    if prev_line is not None and prev_line.strip() != "":
+        col = 1
+        return f"missing_blank_line_before_heading at column {col}."
+
+    # check below
+    if next_line is not None and next_line.strip() != "":
+        col = 1
+        return f"missing_blank_line_after_heading at column {col}."
+
     return None
+
+@checker.define_rule
+def check_markdown_numbered_heading_invalid(block):
+    """
+    Check: Disallow numbered headings like '# 1', '## 1.1', etc.
+    """
+    line = block[5]
+    if line is None:
+        return None
+
+    stripped = line.lstrip()
+    leading_spaces = len(line) - len(stripped)
+
+    match = re.match(r'^(#{1,6})\s+(\d+(?:\.\d+)*\.?)', stripped)
+    if not match:
+        return None
+
+    hashes = match.group(1)
+    number = match.group(2)
+
+    idx = stripped.index(number)
+    col = leading_spaces + idx + 1  # 1-based column
+
+    return f"invalid_numbered_heading_not_allowed at column {col}."
 
 @checker.define_rule
 def check_invalid_spaces_and_unicode(block):
@@ -50,20 +86,23 @@ def check_invalid_spaces_and_unicode(block):
     if line is None:
         return None
 
-    # \u200b: 零宽空格, \u200c: 零宽非连接符, \u200d: 零宽连接符, \ufeff: BOM, \u00a0: 不换行空格
     invalid_chars = {
-        '\u200b': "零宽空格 (\\u200b)",
-        '\u200c': "零宽非连接符 (\\u200c)",
-        '\u200d': "零宽连接符 (\\u200d)",
-        '\ufeff': "BOM 标记 (\\ufeff)",
-        '\u00a0': "不换行空格 (\\u00a0 / 0x00A0)"
+        '\u200b': "zero-width space (\\u200b)",
+        '\u200c': "zero-width non-joiner (\\u200c)",
+        '\u200d': "zero-width joiner (\\u200d)",
+        '\ufeff': "BOM (\\ufeff)",
+        '\u00a0': "non-breaking space (\\u00a0 / 0x00A0)"
     }
 
     for char, name in invalid_chars.items():
         if char in line:
             col = line.index(char) + 1
-            return f"❌ 包含隐藏/非显性 Unicode 字符: [{name}]，位置在第 {col} 列。请使用 Prettier 格式化修复。"
+            reason = f"invalid unicode character [{name}]"
+            return f"{reason} at column {col}."
+
     return None
+
+import re
 
 @checker.define_rule
 def check_forbidden_jsx_imports(block):
@@ -78,172 +117,225 @@ def check_forbidden_jsx_imports(block):
         'import Tabs from "@theme/Tabs";',
         'import TabItem from "@theme/TabItem";'
     ]
-    
+
     if line in allow_list:
         return None
 
-    # 匹配不在代码块内的顶层 import 或 export
-    if re.match(r'^(import\s+.+from|export\s+const\s+)', line.strip()):
-        return "禁止在文档内导入非规范库或编写 JSX 风格的 `import` / `export const`。"
+    stripped = line.lstrip()
+    leading_spaces = len(line) - len(stripped)
+
+    match = re.match(r'^(import\s+.+from|export\s+const\s+)', stripped)
+    if match:
+        col = leading_spaces + match.start() + 1
+        reason = "forbidden import or JSX-style export in document"
+        return f"{reason} at column {col}."
+
     return None
 
 @checker.define_rule
 def check_admonition_spacing(block):
     """
-    检查：::: 上下没有空行。
-    block[4] 是上一行block[5] 是当前行block[6] 是下一行
+    检查 ::: 上下是否有空行
     """
     line = block[5]
     if line is None:
         return None
 
-    # 识别 :::info[xxx] 或 ::: 结尾
-    if line.strip().startswith(':::'):
-        prev_line = block[4]
-        next_line = block[6]
-        
-        # 如果是开头的 :::，检查上一行是否为空行（除非是文件开头）
-        if prev_line is not None and prev_line.strip() != "":
-            # 排除连续闭合的情况，只有在上方有正文内容时才报错
-            if not prev_line.strip().startswith(':::'):
-                return "❌ Admonitions 语法错误：`:::` 上方必须留有一个空行。"
-                
-        # 如果是结尾的 :::，检查下一行是否为空行（除非是文件结尾）
-        if next_line is not None and next_line.strip() != "":
-            if not next_line.strip().startswith(':::'):
-                return "❌ Admonitions 语法错误：`:::` 下方必须留有一个空行。"
-                
+    stripped = line.lstrip()
+    if not stripped.startswith(":::"):
+        return None
+
+    leading_spaces = len(line) - len(stripped)
+    col = line.index(":::") + 1  # 1-based column
+
+    prev_line = block[4]
+    next_line = block[6]
+
+    # 1. 检查上方是否为空行
+    if prev_line is not None:
+        prev_stripped = prev_line.strip()
+        if prev_stripped != "" and not prev_stripped.startswith(":::"):
+            return f"missing_blank_line_above_admonition at column {col}."
+
+    # 2. 检查下方是否为空行
+    if next_line is not None:
+        next_stripped = next_line.strip()
+        if next_stripped != "" and not next_stripped.startswith(":::"):
+            return f"missing_blank_line_below_admonition at column {col}."
+
     return None
 
 @checker.define_rule
 def check_invalid_br_tag(block):
     """
-    检查：使用了不规范的 </br>。
-    规范：如果必须使用换行，应使用 <br> 或 <br/>。
+    检查：不允许使用 </br>
     """
     line = block[5]
     if line is None:
         return None
 
-    if '</br>' in line.lower():
-        return "❌ 错误的换行标签：使用了 `</br>`。请直接敲回车换行，或使用 `<br>` / `<br/>`。"
-    return None
+    lowered = line.lower()
+    if "</br>" not in lowered:
+        return None
+
+    # column 计算
+    idx = lowered.index("</br>")
+    col = idx + 1  # 1-based
+
+    return f"invalid_line_break_tag_use_br_or_br_self_closing at column {col}."
 
 @checker.define_rule
 def check_latex_special_characters(block):
     """
-    检查：温度、电压、数学运算符等特殊字符是否直接打出。
-    规范：这类字符需要使用 LaTeX 标记以增加可读性和兼容性
-    这里主要针对常见的特殊符号做提示，可根据业务灵活增加。
+    检查：不应直接输入特殊物理/数学符号，应使用 LaTeX
     """
     line = block[5]
     if line is None:
         return None
 
-    # 匹配直接输入的 ℃，以及常用于数学或物理的非 ASCII 符号
-    # 注意：需排除在 Markdown 语法如 [^1] 或代码块内的情况（这里做简易判断）
-    forbidden_symbols = [r'℃', r'±', r'×', r'÷', r'Ω']
+    stripped = line.lstrip()
+    leading_spaces = len(line) - len(stripped)
+
+    forbidden_symbols = ["℃", "±", "×", "÷", "Ω", "°"]
+
     for sym in forbidden_symbols:
         if sym in line:
-            return f"❌ 包含特殊字符 `{sym}`：请使用 LaTeX 进行标记（例如使用 $...$ 包含符号），不要使用输入法直打。"
+            idx = line.index(sym)
+            col = leading_spaces + idx + 1  # 1-based
+
+            return f"forbidden_special_character_use_latex at column {col}."
+
     return None
 
 @checker.define_rule
 def check_forbidden_aside_or_quote(block):
     """
-    检查：重要信息/note/info/tip 是否错误使用了 `>` 引用。
-    规范：必须使用 :::info[xxx] 这种格式。
+    Check: Do not use '>' blockquotes for admonitions like note/tip/info.
+    Use :::info[title] instead.
     """
     line = block[5]
     if line is None:
         return None
 
-    # 检查是否以 `>` 开头，且紧跟了 "备注", "注意", "提示", "Note", "Tip"
-    stripped = line.strip()
-    if stripped.startswith('>'):
-        if re.search(r'>\s*(备注|注意|提示|Note|Tip|info|tip|note)[:：]', stripped, re.IGNORECASE):
-            return "❌ 格式错误：请勿使用 `>` 来标记重要提示。请改用 `:::info[标题]` 块级语法。"
+    stripped = line.lstrip()
+    if not stripped.startswith(">"):
+        return None
+
+    leading_spaces = len(line) - len(stripped)
+    idx = line.index(">")
+
+    if re.search(r'\s*(备注|注意|提示|Note|Tip|info|note)\s*[:：]', stripped, re.IGNORECASE):
+        col = leading_spaces + idx + 1
+        return f"forbidden_blockquote_for_admonition_use_admonition_block at column {col}."
+
     return None
 
 @checker.define_rule
 def check_bold_in_headings(block):
     """
-    检查：在标题行（如 ##）中使用了 **xxx** 加粗。
+    Check: Do not use bold syntax (**text**) inside heading lines.
     """
     line = block[5]
     if line is None:
         return None
 
-    # 匹配以 # 开头的标题行中是否包含 **
-    if line.strip().startswith('#') and '**' in line:
-        return "❌ 标题行格式错误：请勿在标题行内使用 `**xxx**` 进行加粗。"
-    return None
+    stripped = line.lstrip()
+    if not stripped.startswith("#"):
+        return None
+
+    if "**" not in line:
+        return None
+
+    idx = line.index("**")
+    leading_spaces = len(line) - len(stripped)
+    col = leading_spaces + idx + 1
+
+    return f"invalid_bold_in_heading_line at column {col}."
 
 @checker.define_rule
 def check_invalid_list_punctuation(block):
     """
-    检查：
-    1. 在普通语句中使用顿号 `、` 会导致翻译困难。
-    2. 使用了 `1、xxx` 形式的错误列表。
+    Check:
+    1. Do not use '1、' as list numbering format.
+    2. Avoid using the punctuation '、' in normal text for readability and translation consistency.
     """
     line = block[5]
     if line is None:
         return None
 
-    stripped = line.strip()
-    # 1. 检查数字加顿号的错误列表：例如 1、 2、
-    if re.match(r'^\d+、', stripped):
-        return "❌ 列表序号格式错误：使用了 `1、`。请修改为标准 Markdown 格式：`1. `（数字 + 点 + 空格）。"
-    
-    # 2. 检查单行文本里误用顿号（这会让翻译引擎难以处理）
-    # 注：此规则可根据文档实际需求开启，若专业词汇必须用顿号，可调整此正则
+    stripped = line.lstrip()
+    leading_spaces = len(line) - len(stripped)
+
+    # 1. invalid ordered list format: 1、xxx
+    match = re.match(r'^(\d+)、', stripped)
+    if match:
+        col = leading_spaces + match.start(1) + len(match.group(1)) + 1
+        return f"invalid_ordered_list_format_use_dot_instead at column {col}."
+
+    # 2. general punctuation check for '、'
     if '、' in line:
-        # 如果不是在代码块内，抛出警告
-        return "字符 `、`。在多语言翻译中顿号难以识别，建议改用逗号或标准列表格式。"
+        idx = line.index('、')
+        col = leading_spaces + idx + 1
+        return f"invalid_punctuation_use_comma_or_list_format at column {col}."
+
     return None
 
 @checker.define_rule
 def check_non_english_quotes(block):
     """
-    检查输入中是否包含非英文引号（弯引号/全角引号），例如：
-    “ ” ‘ ’ « »
-    这些字符在部分解析/翻译场景中可能导致不一致或无法识别。
+    Check: Disallow non-ASCII quotation marks for consistency in parsing and translation.
     """
     line = block[5]
     if line is None:
         return None
 
-    stripped = line.strip()
+    # detect full line content (do not strip for indexing accuracy)
+    forbidden_quotes = "“”‘’«»"
 
-    # 检测常见非英文引号
-    if re.search(r'[“”‘’«»]', stripped):
-        return "非英文引号（如 “ ” ‘ ’ « »）。建议统一替换为标准英文引号：\" 或 '。"
+    for ch in forbidden_quotes:
+        if ch in line:
+            idx = line.index(ch)
+            col = idx + 1  # 1-based column
+
+            return f"non_ascii_quote_used_use_ascii_quotes_instead at column {col}."
 
     return None
 
 @checker.define_rule
 def check_invalid_html_anchor(block):
     """
-    检查：使用 <a> 作为链接引用（例如 <a id="xxx"></a>），这会破坏 md 引用关系。
+    Check: Disallow HTML anchor tags (<a id="...">) that break Markdown reference consistency.
     """
     line = block[5]
     if line is None:
         return None
 
-    if re.search(r'<a\s+id=', line, re.IGNORECASE):
-        return "链接引用错误：禁止使用 `<a id=\"...\">` 标签，容易出现编译不确定性。"
-    return None
+    match = re.search(r'<a\s+id\s*=', line, re.IGNORECASE)
+    if not match:
+        return None
 
+    idx = match.start()
+    col = idx + 1  # 1-based column
+
+    return f"invalid_html_anchor_tag_use_markdown_link_instead at column {col}."
 
 @checker.define_rule
 def check_nested_numeric_list(block):
     """
-    检查：不规范使用数字列表（例如 `- 1.xxx` 这种把数字写在无序列表里的写法）。
+    Check: Disallow nested ordered list inside unordered list (e.g., "- 1. xxx").
     """
     line = block[5]
     if line is None:
         return None
 
-    if re.match(r'^-\s+\d+\.', line.strip()):
-        return "嵌套数字列表不规范：请勿使用 `- 1. xxx`。请直接使用标准的 `1. xxx` 格式。"
-    return None
+    stripped = line.lstrip()
+    leading_spaces = len(line) - len(stripped)
+
+    match = re.match(r'^[-*]\s+(\d+)\.', stripped)
+    if not match:
+        return None
+
+    idx = match.start(1)
+    col = leading_spaces + idx + 1  # 1-based column
+
+    return f"invalid_nested_ordered_list_use_flat_numbering_at_top_level at column {col}."
