@@ -25,6 +25,8 @@ def load_rules_from_dir(package_name):
 
 
 def run_check(text):
+    # init error count
+    error_count = 0
 
     lines = text.splitlines() 
     logger.info("🚀 Starting multi-module automated check with sliding block...")
@@ -53,11 +55,14 @@ def run_check(text):
             try:
                 error_msg = rule_func(block)
                 if error_msg:
+                    error_count += 1
                     logger.warning(
                         f"\n❌ Line {line_num} triggered rule {rule_func.__name__}\n::error file={input_path},line={line_num}::{error_msg}"
                     )
             except Exception as e:
                 logger.error(f"❌ {rule_func.__name__} {e}")
+    
+    return error_count
 
 if __name__ == '__main__':
     logging.basicConfig(
@@ -87,4 +92,10 @@ if __name__ == '__main__':
 
     sample_text = input_path.read_text(encoding="utf-8")
 
-    run_check(sample_text)
+    status_code = 0
+
+    status_code = run_check(sample_text)
+
+    print(status_code)
+
+    sys.exit(status_code)
