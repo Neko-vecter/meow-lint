@@ -102,8 +102,6 @@ def check_invalid_spaces_and_unicode(block):
 
     return None
 
-import re
-
 @checker.define_rule
 def check_forbidden_jsx_imports(block):
     """
@@ -339,3 +337,30 @@ def check_nested_numeric_list(block):
     col = leading_spaces + idx + 1  # 1-based column
 
     return f"invalid_nested_ordered_list_use_flat_numbering_at_top_level at column {col}."
+
+@checker.define_rule
+def check_img_element_usage(block):
+    """
+    Not Use <img> 
+    """
+    line = block[5]
+    if line is None:
+        return None
+
+    allow_list = []
+    if line in allow_list:
+        return None
+
+    stripped = line.lstrip()
+    leading_spaces = len(line) - len(stripped)
+
+    # 匹配 <img ...>
+    pattern = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+    match = pattern.search(line)
+
+    if match:
+        col = leading_spaces + match.start() + 1
+        reason = "use_imageview_instead_of_img"
+        return f"{reason} at column {col}."
+
+    return None
