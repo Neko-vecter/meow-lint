@@ -54,7 +54,7 @@ def run_check(text):
                 error_msg = rule_func(block)
                 if error_msg:
                     logger.warning(
-                        f"\n❌ Line {line_num} triggered rule {rule_func.__name__}\n{error_msg}\n::error file={input_path},line={line_num}::{error_msg}"
+                        f"\n❌ Line {line_num} triggered rule {rule_func.__name__}\n::error file={input_path},line={line_num}::{error_msg}"
                     )
             except Exception as e:
                 logger.error(f"❌ {rule_func.__name__} {e}")
