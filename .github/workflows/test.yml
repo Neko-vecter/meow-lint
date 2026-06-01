@@ -7,15 +7,10 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
-    name: Build wiki
+  pr-check:
+    name: check file
     
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [24.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
     - uses: actions/checkout@v6
@@ -44,4 +39,3 @@ jobs:
             [[ "$file" != *.mdx ]] && continue
             python checker/src/main.py -i "$file"
           done
-          
