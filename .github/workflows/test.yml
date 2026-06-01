@@ -23,6 +23,7 @@ jobs:
       uses: actions/setup-node@v6
       with:
         node-version: '24.x'
+        
     # code check
     - name: Checkout checker repo
       uses: actions/checkout@v6
@@ -35,13 +36,12 @@ jobs:
         python-version: "3.12"
 
     - name: Run checker
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        git diff --name-only \
-          ${{ github.event.pull_request.base.sha }} \
-          ${{ github.event.pull_request.head.sha }} \
-        | grep '\.mdx$' || true \
+        gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path' \
         | while read -r file; do
-            [ -z "$file" ] && continue
+            [[ "$file" != *.mdx ]] && continue
             python checker/src/main.py -i "$file"
           done
           
