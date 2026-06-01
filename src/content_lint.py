@@ -84,7 +84,7 @@ if __name__ == '__main__':
 
     from registry import checker
 
-    load_rules_from_dir('module')
+    load_rules_from_dir('content_module')
 
     input_path = Path(args.input)
     if not input_path.exists():
