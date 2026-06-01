@@ -1,0 +1,42 @@
+# this workflow use as pull request check 
+
+name: test
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build wiki
+    
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+
+    steps:
+    - uses: actions/checkout@v6
+    - name: Use Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '24.x'
+    # code check
+    - name: Checkout checker repo
+      uses: actions/checkout@v6
+      with:
+        repository: Neko-vecter/meow-lint
+        path: checker
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Run checker
+      run: |
+        find . -name "*.mdx" | while read file; do
+          python checker/src/main.py -i "$file"
+        done
+        
