@@ -36,7 +36,10 @@ jobs:
 
     - name: Run checker
       run: |
-        find . -name "*.mdx" | while read file; do
-          python checker/src/main.py -i "$file"
-        done
-        
+        git diff --name-only \
+          ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} \
+          --diff-filter=AM \
+          | grep '\.mdx$' \
+          | while read file; do
+              python checker/src/main.py -i "$file"
+            done
