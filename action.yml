@@ -1,0 +1,33 @@
+name: "meow lint action"
+description: "check"
+inputs:
+  github_token:
+    required: true
+    description: "GitHub token"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+
+    - name: check env
+      shell: bash
+      run: |
+        type gh >/dev/null 2>&1 || echo "gh is required"
+
+    - name: Run checker
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+      run: |
+        gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path' \
+        | while read -r file; do
+            [[ "$file" != *.mdx ]] && continue
+            python ${{ github.action_path }}/src/content_lint.py -i "$file"
+          done
