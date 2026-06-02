@@ -7,35 +7,10 @@ on:
     branches: [ "main" ]
 
 jobs:
-  pr-check:
-    name: check file
-    
+  lint:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v6
-    - name: Use Node.js
-      uses: actions/setup-node@v6
-      with:
-        node-version: '24.x'
-        
-    # code check
-    - name: Checkout checker repo
-      uses: actions/checkout@v6
-      with:
-        repository: Neko-vecter/meow-lint
-        path: checker
-
-    - uses: actions/setup-python@v6
-      with:
-        python-version: "3.12"
-
-    - name: Run checker
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path' \
-        | while read -r file; do
-            [[ "$file" != *.mdx ]] && continue
-            python checker/src/content_lint.py -i "$file"
-          done
+      - name: Run Meow Linter
+        uses: Neko-vecter/meow-lint@main
+        with:
+          github_token: ${{ github.token }}
