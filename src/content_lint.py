@@ -106,6 +106,9 @@ if __name__ == '__main__':
         file_error = run_check(sample_text)
         status_code = status_code + file_error
 
-        logger.info(f"file {input_path} error {file_error} total error {status_code}")
+        if file_error != 0:
+            logger.error(f"file {input_path} error {file_error} total error {status_code}")
+        else:
+            logger.info(f"file {input_path} error {file_error} total error {status_code}")
 
     sys.exit(status_code)
