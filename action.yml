@@ -23,8 +23,15 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github_token }}
       run: |
-        gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path' \
-        | while read -r file; do
-            [[ "$file" != *.mdx ]] && continue
-            python ${{ github.action_path }}/src/content_lint.py -i "$file"
-          done
+        files=()
+
+        while read -r file; do
+          [[ "$file" != *.md && "$file" != *.mdx ]] && continue
+          files+=("$file")
+        done < <(
+          gh pr view ${{ github.event.pull_request.number }} \
+            --json files \
+            -q '.files[].path'
+        )
+
+        python ${{ github.action_path }}/src/content_lint.py -i "${files[@]}"

@@ -73,7 +73,15 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description="Run checker on text or file")
-    parser.add_argument("-i", "--input", help="input file path", required=True)
+
+    parser.add_argument(
+        "-i",
+        "--input",
+        nargs="+",
+        help="input file paths",
+        required=True
+    )
+
     args = parser.parse_args()
 
     # ===== path setup =====
@@ -83,19 +91,21 @@ if __name__ == '__main__':
         sys.path.insert(0, str(SRC_DIR))
 
     from registry import checker
-
     load_rules_from_dir('content_module')
-
-    input_path = Path(args.input)
-    if not input_path.exists():
-        raise FileNotFoundError(f"Input file not found: {input_path}")
-
-    sample_text = input_path.read_text(encoding="utf-8")
 
     status_code = 0
 
-    status_code = run_check(sample_text)
+    for file_path in args.input:
+        input_path = Path(file_path)
 
-    print(status_code)
+        if not input_path.exists():
+            raise FileNotFoundError(f"Input file not found: {input_path}")
+
+        sample_text = input_path.read_text(encoding="utf-8")
+
+        file_error = run_check(sample_text)
+        status_code = status_code + file_error
+
+        print(f"file {input_path} error {file_error} total error {status_code}")
 
     sys.exit(status_code)
