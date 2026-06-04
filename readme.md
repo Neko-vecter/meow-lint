@@ -28,9 +28,10 @@ jobs:
 ### CLI
 
 ```shell
-python3 <path_to>/src/content_lint.py -i <path_to>/file.mdx
+python3 <path_to>/src/content_lint.py -i "<path_to>/file1.mdx" "<path_to>/file2.mdx"
 ```
 
 ## TODO
 
+- [x] add multi file input
 - [ ] add custom checker support for action workflow
