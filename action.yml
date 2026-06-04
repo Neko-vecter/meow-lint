@@ -25,13 +25,11 @@ runs:
       run: |
         files=()
 
-        while read -r file; do
+        while IFS= read -r file; do
           [[ "$file" != *.md && "$file" != *.mdx ]] && continue
           files+=("$file")
         done < <(
-          gh pr view ${{ github.event.pull_request.number }} \
-            --json files \
-            -q '.files[].path'
+          gh pr diff ${{ github.event.pull_request.number }} --name-only
         )
 
         python ${{ github.action_path }}/src/content_lint.py -i "${files[@]}"
