@@ -21,6 +21,13 @@ def check_invalid_title_format(block):
     if len(line.strip()) == len(hashes):
         return None
 
+    prev_line = block[4]
+    next_line = block[6]
+
+    if (prev_line is not None and prev_line.lstrip().startswith("#")) or \
+       (next_line is not None and next_line.lstrip().startswith("#")):
+        return None
+
     col = len(hashes) + 1  # first character after '#'
 
     return f"invalid_markdown_heading_format at column {col}."
@@ -40,6 +47,10 @@ def check_invalid_title_space(block):
 
     prev_line = block[4]
     next_line = block[6]
+
+    if (prev_line is not None and prev_line.lstrip().startswith("#")) or \
+       (next_line is not None and next_line.lstrip().startswith("#")):
+        return None
 
     # check above
     if prev_line is not None and prev_line.strip() != "":
