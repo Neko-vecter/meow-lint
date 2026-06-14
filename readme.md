@@ -20,7 +20,7 @@ jobs:
 
       # run lint
       - name: Run Meow Linter
-        uses: Neko-vecter/meow-lint@v1.0.1
+        uses: Neko-vecter/meow-lint@v1.0.4
         with:
           github_token: ${{ github.token }}
 ```
