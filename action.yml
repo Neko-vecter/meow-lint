@@ -24,12 +24,17 @@ runs:
         GH_TOKEN: ${{ inputs.github_token }}
       run: |
         files=()
-
+      
         while IFS= read -r file; do
           [[ "$file" != *.md && "$file" != *.mdx ]] && continue
           files+=("$file")
         done < <(
           gh pr diff ${{ github.event.pull_request.number }} --name-only
         )
-
+      
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "No markdown files changed, skipping content lint."
+          exit 0
+        fi
+      
         python ${{ github.action_path }}/src/content_lint.py -i "${files[@]}"
