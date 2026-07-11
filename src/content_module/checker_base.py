@@ -120,21 +120,35 @@ def check_forbidden_jsx_imports(block):
     if line is None:
         return None
 
-    allow_list = [
-        'import Tabs from "@theme/Tabs";',
-        'import TabItem from "@theme/TabItem";'
-    ]
-
-    if line in allow_list:
-        return None
-
     stripped = line.lstrip()
     leading_spaces = len(line) - len(stripped)
 
-    match = re.match(r'^(import\s+.+from|export\s+const\s+)', stripped)
-    if match:
-        col = leading_spaces + match.start() + 1
-        reason = "forbidden import or JSX-style export in document"
+    # 允许的 import 模块
+    allow_modules = {
+        "@theme/Tabs",
+        "@theme/TabItem",
+        "@theme/DocCardList",
+    }
+
+    # import xxx from "..."
+    m = re.match(
+        r"""^import\s+.+?\s+from\s+(['"])([^'"]+)\1\s*;?\s*$""",
+        stripped,
+    )
+    if m:
+        module = m.group(2)
+        if module in allow_modules:
+            return None
+
+        col = leading_spaces + 1
+        reason = "forbidden import in document"
+        return f"{reason} at column {col}."
+
+    # export const ...
+    m = re.match(r"^export\s+const\s+", stripped)
+    if m:
+        col = leading_spaces + m.start() + 1
+        reason = "forbidden JSX-style export in document"
         return f"{reason} at column {col}."
 
     return None
