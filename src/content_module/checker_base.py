@@ -217,7 +217,7 @@ def check_latex_special_characters(block):
     stripped = line.lstrip()
     leading_spaces = len(line) - len(stripped)
 
-    forbidden_symbols = ["℃", "±", "×", "÷", "Ω", "°"]
+    forbidden_symbols = ["℃", "±", "×", "÷", "Ω", "°", "①"]
 
     for sym in forbidden_symbols:
         if sym in line:
